@@ -4,7 +4,6 @@ import android.util.Log
 import android.view.View
 import androidx.recyclerview.widget.RecyclerView
 import com.example.roompractice.databinding.TodoItemBinding
-import java.util.*
 
 class TodoRecyclerViewHolder(
     todoRecyclerViewInterface: TodoRecyclerViewInterface,
@@ -15,18 +14,20 @@ class TodoRecyclerViewHolder(
     private val todoText = binding.todoText
     private val deleteButton = binding.deleteButton
     private var todoRecyclerViewInterface: TodoRecyclerViewInterface? = null
+    lateinit var todo: TodoEntity
 
     init {
         deleteButton.setOnClickListener(this)
         this.todoRecyclerViewInterface = todoRecyclerViewInterface
     }
 
-    fun bind(todoModel: TodoModel){
-        todoText.text = todoModel.todo
+    fun bind(todoEntity: TodoEntity){
+        todoText.text = todoEntity.todo
+        todo = todoEntity
     }
 
     override fun onClick(v: View?) {
         Log.d(TAG, "TodoRecyclerViewHolder - onClick: $adapterPosition");
-        this.todoRecyclerViewInterface?.onDeleteButtonClicked(adapterPosition)
+        this.todoRecyclerViewInterface?.onDeleteButtonClicked(todo)
     }
 }

@@ -2,6 +2,7 @@ package com.example.roompractice
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -10,32 +11,31 @@ import androidx.appcompat.app.AlertDialog
 import androidx.databinding.DataBindingUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.roompractice.databinding.ActivityMainBinding
-import java.util.*
-import kotlin.collections.ArrayList
 
+@SuppressLint("StaticFieldLeak")
 class MainActivity : AppCompatActivity(), TodoRecyclerViewInterface {
     private val TAG: String = "로그"
     private lateinit var binding: ActivityMainBinding;
+
+    lateinit var db: TodoDatabase
     lateinit var todoRecyclerViewAdapter: TodoRecyclerViewAdapter;
+    var todoList: List<TodoEntity> = listOf()
 
-    val todoList: ArrayList<TodoModel> = ArrayList<TodoModel>()
-
-    @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "MainActivity - onCreate: ");
         super.onCreate(savedInstanceState)
 
+        db = TodoDatabase.getInstance(this)!!
+
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         binding.activity = this@MainActivity
 
-        todoRecyclerViewAdapter = TodoRecyclerViewAdapter(this, todoList, this)
-        binding.myRecyclerView.apply {
-            layoutManager =
-                LinearLayoutManager(this@MainActivity, LinearLayoutManager.VERTICAL, false)
-            adapter = todoRecyclerViewAdapter
-        }
+        hideKeyboardOnTouchOutside()
+        loadTodos()
+    }
 
-
+    @SuppressLint("ClickableViewAccessibility")
+    fun hideKeyboardOnTouchOutside(){
         binding.mainLayout.setOnTouchListener{ _, _ ->
             hideSoftInput()
             true
@@ -45,8 +45,22 @@ class MainActivity : AppCompatActivity(), TodoRecyclerViewInterface {
             hideSoftInput()
             true
         }
+    }
 
-        todoRecyclerViewAdapter.loadTodos()
+    fun loadTodos(){
+        val getTask = object: AsyncTask<Unit, Unit, Unit>(){
+            override fun doInBackground(vararg params: Unit?) {
+                todoList = db.todoDao().getAllTodos()
+                Log.d(TAG, "MainActivity - doInBackground: $todoList ");
+            }
+
+            override fun onPostExecute(result: Unit?) {
+                super.onPostExecute(result)
+                setRecyclerView(todoList)
+            }
+        }
+
+        getTask.execute()
     }
 
     fun addTodo(){
@@ -60,20 +74,51 @@ class MainActivity : AppCompatActivity(), TodoRecyclerViewInterface {
         }
         Log.d(TAG, "MainActivity - addTodo button clicked! input is $inputText");
 
-        todoRecyclerViewAdapter.addTodo(TodoModel(inputText))
-        binding.todoInput.text.clear()
+        val insertTask =
+        object: AsyncTask<Unit, Unit, Unit>(){
+            override fun doInBackground(vararg params: Unit?) {
+                val todo = TodoEntity(null, inputText)
+                db.todoDao().insertTodo(todo)
+            }
 
+            override fun onPostExecute(result: Unit?) {
+                super.onPostExecute(result)
+                loadTodos()
+            }
+        }
+        insertTask.execute()
+
+        binding.todoInput.text.clear()
         hideSoftInput()
+    }
+
+    override fun onDeleteButtonClicked(todo: TodoEntity) {
+        val deleteTask = object: AsyncTask<Unit, Unit, Unit>(){
+            override fun doInBackground(vararg params: Unit?) {
+                db.todoDao().delete(todo)
+            }
+
+            override fun onPostExecute(result: Unit?) {
+                super.onPostExecute(result)
+                loadTodos()
+            }
+        }
+
+        deleteTask.execute()
+    }
+
+    fun setRecyclerView(todoList: List<TodoEntity>){
+        todoRecyclerViewAdapter = TodoRecyclerViewAdapter(this, todoList, this)
+        binding.myRecyclerView.apply {
+            layoutManager =
+                    LinearLayoutManager(this@MainActivity, LinearLayoutManager.VERTICAL, false)
+            adapter = todoRecyclerViewAdapter
+        }
     }
 
     private fun hideSoftInput() {
         val inputMethodManager =
             getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
         inputMethodManager.hideSoftInputFromWindow(binding.todoInput.windowToken, 0)
-    }
-
-    override fun onDeleteButtonClicked(id: Int) {
-        Log.d(TAG, "MainActivity - onDeleteButtonClicked: ");
-        todoRecyclerViewAdapter.deleteTodo(id)
     }
 }
